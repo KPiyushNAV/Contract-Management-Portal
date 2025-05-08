@@ -1,0 +1,57 @@
+.domain-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background:  rgba(0, 0, 0, 0.6);;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+  }
+  
+  .domain-modal-content {
+    background: #0a0a0a;
+    border-radius: 14px;
+    padding: 30px 20px;
+    max-width: 360px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(211, 238, 77, 0.3);
+    z-index: 10000;
+  }
+  
+  .domain-question {
+    font-size: 18px;
+    margin-bottom: 24px;
+    color: #333;
+  }
+  
+  .domain-buttons button {
+    width: 100%;
+    padding: 12px 15px;
+    font-size: 16px;
+    border: none;
+    border-radius: 25px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  
+  .yes-btn {
+    background-color: #e5da49;
+    color: rgb(8, 8, 8);
+  }
+  
+  .yes-btn:hover {
+    background-color: #f8f838;
+  }
+  
+  .no-btn {
+    background-color: #f3f4f6;
+    color: #0f0f0f;
+  }
+  
+  .no-btn:hover {
+    background-color: #f8f9fb;
+  }

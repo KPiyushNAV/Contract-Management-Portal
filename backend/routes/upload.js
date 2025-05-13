@@ -6,7 +6,6 @@ const supabase = require('../SupabaseClient');
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Validate metadata function
 const validateMetadata = (metadata) => {
   const requiredFields = ['folder', 'description', 'owned_by', 'maintained_by', 'start_date', 'expiration_date'];
   const missingFields = [];
@@ -23,13 +22,15 @@ const validateMetadata = (metadata) => {
   };
 };
 
+
+
 router.post('/', upload.array('files'), async (req, res) => {
   const files = req.files;
   const metadataList = JSON.parse(req.body.metadata || '[]');
   const uploadedMetadata = [];
 
   try {
-    // Additional validation check on the server side
+    
     for (let i = 0; i < metadataList.length; i++) {
       const validation = validateMetadata(metadataList[i]);
       if (!validation.valid) {
@@ -40,7 +41,7 @@ router.post('/', upload.array('files'), async (req, res) => {
       }
     }
 
-    // Process files and upload
+    
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const metadata = metadataList[i] || {};
@@ -64,11 +65,11 @@ router.post('/', upload.array('files'), async (req, res) => {
 
       const url = publicUrlData?.publicUrl || null;
 
-      // Process dates - no need to convert empty strings to null as we've already validated
+     
       const start_date = metadata.start_date;
       const expiration_date = metadata.expiration_date;
 
-      // Current date for upload timestamp
+      
       const uploaded_date = new Date().toISOString();
 
       const { data: inserted, error: dbError } = await supabase
@@ -106,12 +107,44 @@ router.post('/', upload.array('files'), async (req, res) => {
   }
 });
 
-router.get('/files', async (req, res) => {
+// Add to upload.js
+router.put('/archive/:id', async (req, res) => {
+  const { id } = req.params;
+  const { archived } = req.body;
+
   try {
     const { data, error } = await supabase
       .from('file_uploads')
-      .select('*')
-      .order('uploaded_date', { ascending: false });
+      .update({
+        archived: archived,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+
+    if (data.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    res.status(200).json(data[0]);
+  } catch (error) {
+    console.error('Archive Error:', error);
+    res.status(500).json({ error: 'Failed to update archive status', details: error.message });
+  }
+});
+
+router.get('/files', async (req, res) => {
+  try {
+    const { archived } = req.query;
+    let query = supabase.from('file_uploads').select('*');
+
+     if (archived !== undefined) {
+      query = query.eq('archived', archived === 'true');
+    }
+    const { data, error } = await query.order('uploaded_date', { ascending: false });
+
 
     if (error) throw error;
 
@@ -129,12 +162,70 @@ router.get('/files', async (req, res) => {
       start_date: file.start_date,
       expiration_date: file.expiration_date,
       uploaded_date: file.uploaded_date,
+      archived: file.archived || false
     }));
 
     res.json(files);
   } catch (error) {
     console.error('Error fetching files:', error);
     res.status(500).json({ error: 'Failed to fetch files' });
+  }
+});
+
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { metadata } = req.body;
+
+  if (!metadata) {
+    return res.status(400).json({ error: 'Metadata is required' });
+  }
+
+  try {
+    // Validate metadata
+    const validation = validateMetadata(metadata);
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: `Missing required fields: ${validation.missingFields.join(', ')}` 
+      });
+    }
+
+    
+    const {
+      folder,
+      description,
+      owned_by,
+      maintained_by,
+      start_date,
+      expiration_date
+    } = metadata;
+
+   
+    const { data, error } = await supabase
+      .from('file_uploads')
+      .update({
+        folder,
+        description,
+        owned_by,
+        maintained_by,
+        start_date,
+        expiration_date,
+        updated_at: new Date().toISOString(), // Add an updated_at timestamp
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+
+    if (data.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Return the updated document
+    res.status(200).json(data[0]);
+  } catch (error) {
+    console.error('Update Error:', error);
+    res.status(500).json({ error: 'Failed to update document', details: error.message });
   }
 });
 

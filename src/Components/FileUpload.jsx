@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect,useRef } from 'react';
 import axios from 'axios';
-import './FileUpload.css';
+import './Fileupload.css';
 import MetadataModal from './MetadataModal';
 import ActionMenu from './ActionMenu'; 
-import { useRef } from 'react';
 import { BsThreeDotsVertical, BsPlusLg } from 'react-icons/bs';
 import moment from 'moment';
 
@@ -19,10 +18,15 @@ function FileUpload() {
   const [showDescriptionPopup, setShowDescriptionPopup] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [showMenuIndex, setShowMenuIndex] = useState(null);
+  const [editingDocument, setEditingDocument] = useState(null);
+  const [viewingArchived, setViewingArchived] = useState(false);
+  const [archivedFiles, setArchivedFiles] = useState([]);
+  const [archivedCount, setArchivedCount] = useState(0);
   const actionMenuRef = useRef(null);
 
   useEffect(() => {
     fetchUploadedFiles();
+    fetchArchivedFiles();
   }, []);
 
   useEffect(() => {
@@ -38,11 +42,33 @@ function FileUpload() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  const handleEditDocument = (document) => {
+    setEditingDocument(document);
+    setShowModal(true);
+  };
   
+  // Add to FileUpload.jsx
+const fetchArchivedFiles = async () => {
+  try {
+    const response = await axios.get('http://localhost:5000/api/upload/files?archived=true');
+    const filesWithDetails = response.data.map(file => ({
+      ...file,
+      selected: false,
+      fileSize: formatFileSize(file.size || 0),
+      uploadedDate: file.uploaded_at ? moment(file.uploaded_at).format('MM/DD/YYYY') : moment().format('MM/DD/YYYY'),
+      type: file.folder || 'Unknown'
+    }));
+    setArchivedFiles(filesWithDetails);
+    setArchivedCount(filesWithDetails.length);
+  } catch (err) {
+    console.error('Error fetching archived files:', err);
+  }
+};
 
   const fetchUploadedFiles = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/upload/files');
+      const response = await axios.get('http://localhost:5000/api/upload/files?archived=false');
       const filesWithDetails = response.data.map(file => ({
         ...file,
         selected: false,
@@ -56,50 +82,99 @@ function FileUpload() {
     }
   };
 
+  // Add to FileUpload.jsx
+const handleArchiveDocument = async (documentId) => {
+  try {
+    await fetchUploadedFiles();
+    await fetchArchivedFiles();
+    setToast({ show: true, message: "Document archived successfully", type: "success" });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+  } catch (err) {
+    console.error('Error updating after archive:', err);
+  }
+};
+
+const handleUnarchiveDocument = async (documentId) => {
+  try {
+    await axios.put(`http://localhost:5000/api/upload/archive/${documentId}`, {
+      archived: false
+    });
+    await fetchUploadedFiles();
+    await fetchArchivedFiles();
+    setToast({ show: true, message: "Document unarchived successfully", type: "success" });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+  } catch (err) {
+    console.error('Error unarchiving document:', err);
+  }
+};
+
   const formatFileSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
     else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
     else return (bytes / 1048576).toFixed(2) + ' MB';
   };
 
-  // Removed the handleFileChange function as it's now handled in MetadataModal
-
   const handleMetadataSubmit = async (metadataList, files) => {
     const formData = new FormData();
-    files.forEach((file) => {
-      formData.append("files", file);
-    });
-    formData.append("metadata", JSON.stringify(metadataList));
-
-    setShowModal(false);
-    setLoading(true);
-
-    try {
-      const res = await axios.post("http://localhost:5000/api/upload", formData);
-      const newFiles = res.data.files.map((file) => ({
-        ...file,
-        selected: false,
-        fileSize: formatFileSize(file.size || 0),
-        uploadedDate: moment().format('MM/DD/YYYY'),
-        type: file.folder || 'Unknown',
-        filename: file.filename,
-        description: file.description || "-",
-        expiration_date: file.expiration_date || "-",
-        owned_by: file.owned_by || "-",
-        start_date: file.start_date || "-",
-        folder: file.folder || "-"
-      }));
-
-      setUploadedFiles([...uploadedFiles, ...newFiles]);
-      setToast({ show: true, message: "Files uploaded successfully", type: "success" });
-      setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
-    } catch (err) {
-      console.error("Upload failed", err);
-      setToast({ show: true, message: "Upload failed. Missing Information", type: "error" });
-      setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
-    } finally {
-      setLoading(false);
+    
+    if (editingDocument) {
+     
+      const editedMetadata = metadataList[0]; 
+      
+      try {
+        setLoading(true);
+        const response = await axios.put(
+          `http://localhost:5000/api/upload/${editingDocument.id}`, 
+          { metadata: editedMetadata }
+        );
+        
+        // Update the document in the local state
+        const updatedFiles = uploadedFiles.map(file => 
+          file.id === editingDocument.id ? {...file, ...response.data} : file
+        );
+        
+        
+        setUploadedFiles(updatedFiles);
+        setEditingDocument(null);
+        setToast({ show: true, message: "Document updated successfully", type: "success" });
+      } catch (err) {
+        console.error("Update failed", err);
+        setToast({ show: true, message: "Update failed. " + (err.response?.data?.error || ""), type: "error" });
+      } finally {
+        setLoading(false);
+        setShowModal(false);
+      }
+    } else {
+      
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+      formData.append("metadata", JSON.stringify(metadataList));
+  
+      setShowModal(false);
+      setLoading(true);
+  
+      try {
+        const res = await axios.post("http://localhost:5000/api/upload", formData);
+        const newFiles = res.data.files.map((file, index) => ({
+          ...file,
+          selected: false,
+          fileSize: formatFileSize(file.size || 0),
+          uploadedDate: moment().format('MM/DD/YYYY'),
+          type: file.folder || 'Unknown',
+        }));
+  
+        setUploadedFiles([...uploadedFiles, ...newFiles]);
+        setToast({ show: true, message: "Files uploaded successfully", type: "success" });
+      } catch (err) {
+        console.error("Upload failed", err);
+        setToast({ show: true, message: "Upload failed. Missing Information", type: "error" });
+      } finally {
+        setLoading(false);
+      }
     }
+    
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
   };
 
   const handleCheckboxChange = (index) => {
@@ -119,6 +194,7 @@ function FileUpload() {
   };
 
   const handleOpenModal = () => {
+    setEditingDocument(null);
     setShowModal(true);
   };
 
@@ -146,9 +222,11 @@ function FileUpload() {
   const folderCounts = getFolderCounts();
 
   
-  const filteredFiles = currentFolder === 'All Documents' 
+  const displayFiles = viewingArchived 
+  ? archivedFiles 
+  : (currentFolder === 'All Documents' 
     ? uploadedFiles 
-    : uploadedFiles.filter(file => file.folder === currentFolder);
+    : uploadedFiles.filter(file => file.folder === currentFolder));
 
   const truncateDescription = (desc, idx) => {
     const limit = 50;
@@ -168,6 +246,7 @@ function FileUpload() {
               className={`parent-folder ${currentFolder === 'All Documents' ? 'active' : ''}`}
               onClick={() => {
                 setCurrentFolder('All Documents');
+                setViewingArchived(false);
                 setDocumentsExpanded(!documentsExpanded);
               }}
             >
@@ -199,16 +278,28 @@ function FileUpload() {
         <div className="document-main">
           <div className="document-toolbar">
             <div className="folder-path">
+              {viewingArchived 
+              ? <span>Archived Documents</span>
+                 : (
+                  <>
               <span>Documents</span>
               {currentFolder !== 'All Documents' && <span> &gt; {currentFolder}</span>}
+              </>
+                 )
+                }
             </div>
             <div className="toolbar-buttons">
-              {/* Replace button with plus icon */}
-              <button className="icon-btn upload-btn" onClick={handleOpenModal}>
-                <BsPlusLg size={18} />
+              
+              <button className="icon-btn-upload-btn" onClick={handleOpenModal}>
+                <BsPlusLg size={20} />
               </button>
-              <button className="new-folder-btn">
-                Archived Folder
+              <button 
+                className={`new-folder-btn ${viewingArchived ? 'active' : ''}`}
+                onClick={() => setViewingArchived(!viewingArchived)}>
+               Archived Folder
+                {archivedCount > 0 && ( 
+                <span className="file-count-unarchive">{archivedCount}</span>
+              )}
               </button>
             </div>
           </div>
@@ -216,21 +307,19 @@ function FileUpload() {
           <div className="document-table">
             <div className="document-table-header">
               <div className="serial-no-cell header-cell">S.No.</div>
-              
               <div className="type-cell header-cell">Type</div>
               <div className="name-cell header-cell">Title</div>
               <div className='desc-cell header-cell'>Description</div>
-              <div className="ownedby-cell header-cell">Owner</div>
-              <div className="maintainedby-cell header-cell">Maintainer</div>
+              <div className="ownedby-cell header-cell">Owned By</div>
+              <div className="maintainedby-cell header-cell">Maintained By</div>
               <div className="data-size-cell header-cell">Valid From</div>
               <div className="ending-cell header-cell">Valid Till</div>
               <div className="uploaded-date-cell header-cell">Uploaded On</div>
               <div className="actions-cell header-cell">Actions</div>
             </div>
-
             <div className="document-table-body">
-              {filteredFiles.length > 0 ? (
-                filteredFiles.map((file, idx) => (
+              {displayFiles.length > 0 ? (
+                displayFiles.map((file, idx) => (
                   <div className="document-row" key={idx}>
                     <div className="serial-no-cell-content">{idx + 1}</div>
                     
@@ -269,13 +358,33 @@ function FileUpload() {
 
                     <div className="uploaded-date-cell">{file.uploadedDate}</div>
                     <div className="actions-cell" style={{ position: 'relative' }} ref={showMenuIndex === idx ? actionMenuRef : null}>
-                    <BsThreeDotsVertical className="action-btn" style={{ cursor: 'pointer' }} onClick={() => setShowMenuIndex(showMenuIndex === idx ? null : idx)} />
-                    {showMenuIndex === idx && (
-                     <div className="action-menu-popup">
-                     <ActionMenu />
-                      </div>
-                    )}
-                   </div>
+              {viewingArchived ? (
+         <button className="unarchive-btn" onClick={() => handleUnarchiveDocument(file.id)}>
+         Unarchive
+        </button>
+       ) : (
+        <>
+    <BsThreeDotsVertical 
+      className="action-btn" 
+      style={{ cursor: 'pointer' }} 
+      onClick={() => setShowMenuIndex(showMenuIndex === idx ? null : idx)} 
+    />
+    {showMenuIndex === idx && (
+      <div className="action-menu-popup">
+        <ActionMenu 
+          onClose={() => setShowMenuIndex(null)} 
+          onEdit={handleEditDocument}
+          onArchive={handleArchiveDocument}
+          documentData={{
+            ...file,
+            fileUrl: `http://localhost:5000/files/${file.filename}`
+          }}
+        />
+      </div>
+    )}
+    </>
+       )}
+  </div>
                   </div>
                 ))
               ) : (
@@ -289,11 +398,15 @@ function FileUpload() {
       </div>
 
       {showModal && (
-        <MetadataModal
-          onSubmit={handleMetadataSubmit}
-          onCancel={handleCancelUpload}
-        />
-      )}
+    <MetadataModal
+      onSubmit={handleMetadataSubmit}
+      onCancel={handleCancelUpload}
+      editDocument={editingDocument}
+      isEditMode={!!editingDocument}
+    
+    />
+  )}
+
       
       {toast.show && (
         <div className="toast-container">

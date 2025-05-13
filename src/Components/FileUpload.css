@@ -5,6 +5,7 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
+  padding-top: 95px;
 }
 
 .document-content {
@@ -51,7 +52,7 @@
 }
 
 .folder-list li:hover {
-  background-color: #dfcf3e;
+  background-color: #fdd835;
   color: black;
 }
 
@@ -62,6 +63,15 @@
 
 .folder-icon {
   margin-right: 8px;
+}
+.file-count-unarchive{
+  position: absolute;
+  right: 16px;
+  background-color: #eed810;
+  border-radius: 6px;
+  padding: 2px 9px;
+  font-size: 12px;
+  color: black;
 }
 
 .file-count {
@@ -79,6 +89,21 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.unarchive-btn {
+  background-color: #dfcf3e;
+  color: black;
+  border: none;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  width: 80px;
+  text-align: center;
+}
+.unarchive-btn:hover {
+  background-color: #f6de05;
 }
 
 .document-toolbar {
@@ -99,9 +124,7 @@
   display: flex;
   gap: 10px;
 }
-
-.upload-btn,
-.new-folder-btn {
+.icon-btn-upload-btn{
   background-color: #fff176;
   color: black;
   border: none;
@@ -113,9 +136,23 @@
   gap: 5px;
 }
 
-.upload-btn:hover,
+.new-folder-btn {
+  background-color: #fff176;
+  color: black;
+  border: none;
+  padding: 8px 27px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+ 
+
+
+.icon-btn-upload-btn:hover,
 .new-folder-btn:hover {
-  background-color: #fdd835;
+  background-color: #fadc56;
 }
 
 .caret {
@@ -136,12 +173,12 @@
 .document-table-header {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
+  padding: 14px 14px;
   border-bottom: 2px solid #ccc;
   font-weight: 600;
   border-right: none;
   color: black;
-  font-size: 17px;
+  font-size: 15px;
   position: sticky;
   top: 0;
   background-color: #dfcf3e;
@@ -245,10 +282,10 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  width: 50px;
-  height: 50px;
+  width: 30px;
+  height: 30px;
   border: none;
-  background-color: #eaf648;
+  background-color: #fff176;
   color: white;
   cursor: pointer;
   transition: background-color 0.3s;
